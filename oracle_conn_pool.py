@@ -4,13 +4,13 @@
 # @Project:  OraclePool
 # @Date:     2019/5/29 15:19
 # @Author:   MaiXiaochai
-# @Modify:   2019/5/29 15:19
+# @Modify:   2019/12/27 10:39
 
 import cx_Oracle as Oracle
 from DBUtils.PooledDB import PooledDB
 
 
-class OrclConnPool(object):
+class OraclePool(object):
     """
     1) 这里封装了一些有关oracle连接池的功能;
     2) sid和service_name，程序会自动判断哪个有值，
@@ -27,11 +27,10 @@ class OrclConnPool(object):
     """
 
     def __init__(self, config):
-        self.conn = OrclConnPool.__get_conn(config)
-        self.cur = self.conn.cursor()
+        self.pool = OrclConnPool.__get_pool(config)
 
     @staticmethod
-    def __get_conn(conf):
+    def __get_pool(conf):
         """
         一些 PoolDB 中可能会用到的参数，根据实际情况自己选择
         mincached：       启动时开启的空连接数量
@@ -54,7 +53,7 @@ class OrclConnPool(object):
 
         __pool = PooledDB(Oracle, user=conf['user'], password=conf['passwd'], dsn=dsn, mincached=5, maxcached=30)
 
-        return __pool.connection()
+        return __pool
 
     def execute_sql(self, sql, args=None):
         """
@@ -63,10 +62,11 @@ class OrclConnPool(object):
         :param args:    list    sql语句参数列表
         """
 
+        cur = self.pool.connection().cursor()
         if args:
-            self.cur.execute(sql, args)
+            cur.execute(sql, args)
         else:
-            self.cur.execute(sql)
+            cur.execute(sql)
 
     def fetch_all(self, sql, args=None):
         """
@@ -75,15 +75,21 @@ class OrclConnPool(object):
         :param args:    list    sql语句参数
         :return:        tuple   fetch结果
         """
-        self.execute_sql(sql, args)
-        return self.cur.fetchall()
+        cur = self.pool.connection().cursor()
+        if args:
+            cur.execute(sql, args)
+        else:
+            cur.execute(sql, args)
+        return cur.fetchall()
 
     def __del__(self):
         """
         在实例资源被回收时，关闭该连接池
         """
-        self.cur.close()
-        self.conn.close()
+        try:
+            self.pool.close()
+        except Exception:
+            pass
 
 
 def simple_demo():
@@ -97,7 +103,7 @@ def simple_demo():
 
     test_sql = "SELECT COUNT(1) FROM TEST_PYTHON"
 
-    orcl = OrclConnPool(orcl_cfg)
+    orcl = OraclePool(orcl_cfg)
     orcl.execute_sql(test_sql)
     res = orcl.cur.fetchone()
     print(res)
