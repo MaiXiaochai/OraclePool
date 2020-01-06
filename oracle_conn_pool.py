@@ -79,7 +79,7 @@ class OraclePool(object):
         if args:
             cur.execute(sql, args)
         else:
-            cur.execute(sql, args)
+            cur.execute(sql)
         return cur.fetchall()
 
     def __del__(self):
