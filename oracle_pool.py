@@ -161,7 +161,7 @@ def demo():
         'service_name': 'maixiaochai'
     }
 
-    sql = "SELECT COUNT(1) FROM MAIXIAOCHAI"
+    sql = "SELECT COUNT(*) FROM MAIXIAOCHAI"
 
     orcl = OraclePool(config)
     result = orcl.fetch_all(sql)
