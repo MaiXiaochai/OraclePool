@@ -10,7 +10,7 @@
 """
 
 import cx_Oracle as Oracle
-from DBUtils import PooledDB
+from DBUtils.PooledDB import PooledDB
 
 
 class OraclePool:
