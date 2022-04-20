@@ -5,12 +5,12 @@
 @File       : oracle_pool.py
 @Author     : maixiaochai
 @Email      : maixiaochai@outlook.com
-@Created on : 2020/4/21 15:47
+@Created on : 2022/4/20 14:27
 --------------------------------------
 """
+from contextlib import contextmanager
 
 import cx_Oracle as Oracle
-from DBUtils.PooledDB import PooledDB
 
 
 class OraclePool:
@@ -20,7 +20,7 @@ class OraclePool:
         若两个都有值，则默认使用service_name；
     3) 关于config的设置，注意只有 port 的值的类型是 int，以下是config样例:
         config = {
-            'user':         'maixiaochai',
+            'username':     'maixiaochai',
             'password':     'maixiaochai',
             'host':         '192.168.158.1',
             'port':         1521,
@@ -29,144 +29,88 @@ class OraclePool:
         }
     """
 
-    def __init__(self, config):
+    def __init__(self, username, password, host, port, sid=None, service_name=None):
         """
-        获得连接池
-        :param config:      dict    Oracle连接信息
+        sid 和 service_name至少存在一个, 若都存在，则默认使用service_name
         """
-        self.__pool = self.__get_pool(config)
+        self.__pool = self.__get_pool(username, password, host, port, sid=sid, service_name=service_name)
 
     @staticmethod
-    def __get_pool(config):
+    def __get_pool(username, password, host, port, sid=None, service_name=None, pool_size=5):
         """
-        :param config:        dict    连接Oracle的信息
         ---------------------------------------------
         以下设置，根据需要进行配置
-        maxconnections=6,   # 最大连接数，0或None表示不限制连接数
-        mincached=2,        # 初始化时，连接池中至少创建的空闲连接。0表示不创建
-        maxcached=5,        # 连接池中最多允许的空闲连接数，很久没有用户访问，连接池释放了一个，由6个变为5个，
-                            # 又过了很久，不再释放，因为该项设置的数量为5
-        maxshared=0,        # 在多个线程中，最多共享的连接数，Python中无用，会最终设置为0
-        blocking=True,      # 没有闲置连接的时候是否等待， True，等待，阻塞住；False，不等待，抛出异常。
-        maxusage=None,      # 一个连接最多被使用的次数，None表示无限制
-        setession=[],       # 会话之前所执行的命令, 如["set charset ...", "set datestyle ..."]
-        ping=0,             # 0  永远不ping
-                            # 1，默认值，用到连接时先ping一下服务器
-                            # 2, 当cursor被创建时ping
-                            # 4, 当SQL语句被执行时ping
-                            # 7, 总是先ping
+        max                 最大连接数
+        min                 初始化时，连接池中至少创建的空闲连接。0表示不创建
+        increment           每次增加的连接数量
+        pool_size           连接池大小，这里为了避免连接风暴造成的资源浪费，设置了 max = min = pool_size
         """
         dsn = None
-        host, port = config.get('host'), config.get('port')
+        if service_name:
+            dsn = Oracle.makedsn(host, port, service_name=service_name)
+        elif sid:
+            dsn = Oracle.makedsn(host, port, sid=sid)
 
-        if 'service_name' in config:
-            dsn = Oracle.makedsn(host, port, service_name=config.get('service_name'))
+        return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=pool_size, max=pool_size, increment=0,
+                                  encoding='UTF-8')
 
-        elif 'sid' in config:
-            dsn = Oracle.makedsn(host, port, sid=config.get('sid'))
+    @property
+    @contextmanager
+    def pool(self):
+        _conn = None
+        _cursor = None
+        try:
+            _conn = self.__pool.acquire()
+            _cursor = _conn.cursor()
+            yield _cursor
+        finally:
+            _conn.commit()
+            self.__pool.release(_conn)
 
-        pool = PooledDB(
-            Oracle,
-            mincached=5,
-            maxcached=10,
-            user=config.get('user'),
-            password=config.get('password'),
-            dsn=dsn
-        )
-
-        return pool
-
-    def __get_conn(self):
-        """
-        从连接池中获取一个连接，并获取游标。
-        :return: conn, cursor
-        """
-        conn = self.__pool.connection()
-        cursor = conn.cursor()
-
-        return conn, cursor
-
-    @staticmethod
-    def __reset_conn(conn, cursor):
-        """
-        把连接放回连接池。
-        :return:
-        """
-        cursor.close()
-        conn.close()
-
-    def __execute(self, sql, args=None):
+    def execute(self, sql: str, *args, **kwargs):
         """
         执行sql语句
         :param sql:     str     sql语句
         :param args:    list    sql语句参数列表
-        :param return:  cursor
+        :return:        conn, cursor
         """
-        conn, cursor = self.__get_conn()
-        cursor.execute(sql, args)
+        with self.pool as cursor:
+            cursor.execute(sql, *args, **kwargs)
 
-        return conn, cursor
+    def executemany(self, sql, *args, **kwargs):
+        """
+        批量执行。
+        :param sql:     str     sql语句
+        :param args:    list    sql语句参数
+        :return:        tuple   fetch结果
+        """
+        with self.pool as cursor:
+            cursor.executemany(sql, *args, **kwargs)
 
-    def fetch_all(self, sql, args=None):
+    def fetchone(self, sql, *args, **kwargs) -> tuple:
         """
         获取全部结果
         :param sql:     str     sql语句
         :param args:    list    sql语句参数
         :return:        tuple   fetch结果
         """
-        conn, cursor = self.__execute(sql, args)
-        result = cursor.fetchall()
-        self.__reset_conn(conn, cursor)
+        with self.pool as cursor:
+            cursor.execute(sql, *args, **kwargs)
+            return cursor.fetchone()
 
-        return result
-
-    def fetch_one(self, sql, args=None):
+    def fetchall(self, sql, *args, **kwargs):
         """
         获取全部结果
         :param sql:     str     sql语句
         :param args:    list    sql语句参数
         :return:        tuple   fetch结果
         """
-        conn, cursor = self.__execute(sql, args)
-        result = cursor.fetchone()
-        self.__reset_conn(conn, cursor)
-
-        return result
-
-    def execute_sql(self, sql, args=None):
-        """
-        执行SQL语句。
-        :param sql:     str     sql语句
-        :param args:    list    sql语句参数
-        :return:        tuple   fetch结果
-        """
-        conn, cursor = self.__execute(sql, args)
-        conn.commit()
-        self.__reset_conn(conn, cursor)
+        with self.pool as cursor:
+            cursor.execute(sql, *args, **kwargs)
+            return cursor.fetchall()
 
     def __del__(self):
         """
         关闭连接池。
         """
         self.__pool.close()
-
-
-def demo():
-    config = {
-        'user': 'maixiaochai',
-        'password': 'maixiaochai',
-        'host': '192.168.158.1',
-        'port': 1521,
-        'sid': 'maixiaochai',
-        'service_name': 'maixiaochai'
-    }
-
-    sql = "SELECT COUNT(*) FROM MAIXIAOCHAI"
-
-    orcl = OraclePool(config)
-    result = orcl.fetch_all(sql)
-    print(result)
-
-
-if __name__ == "__main__":
-    demo()
