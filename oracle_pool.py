@@ -36,7 +36,7 @@ class OraclePool:
         self.__pool = self.__get_pool(username, password, host, port, sid=sid, service_name=service_name)
 
     @staticmethod
-    def __get_pool(username, password, host, port, sid=None, service_name=None, pool_size=5):
+    def __get_pool(username, password, host, port, sid=None, service_name=None, min_size=1, max_size=10):
         """
         ---------------------------------------------
         以下设置，根据需要进行配置
@@ -51,8 +51,8 @@ class OraclePool:
         elif sid:
             dsn = Oracle.makedsn(host, port, sid=sid)
 
-        return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=pool_size, max=pool_size, increment=0,
-                                  encoding='UTF-8')
+        return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=min_size, max=max_size, increment=1,
+                                  encoding='UTF-8', threaded=True)
 
     @property
     @contextmanager
