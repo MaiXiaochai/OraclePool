@@ -36,14 +36,12 @@ class OraclePool:
         self.__pool = self.__get_pool(username, password, host, port, sid=sid, service_name=service_name)
 
     @staticmethod
-    def __get_pool(username, password, host, port, sid=None, service_name=None, min_size=1, max_size=10):
+    def __get_pool(username, password, host, port, sid=None, service_name=None, min_size=1, max_size=10, increment=1):
         """
-        ---------------------------------------------
         以下设置，根据需要进行配置
-        max                 最大连接数
-        min                 初始化时，连接池中至少创建的空闲连接。0表示不创建
+        min_size            初始化时，连接池中至少创建的空闲连接。0表示不创建
+        max_size            最大连接数
         increment           每次增加的连接数量
-        pool_size           连接池大小，这里为了避免连接风暴造成的资源浪费，设置了 max = min = pool_size
         """
         dsn = None
         if service_name:
@@ -51,8 +49,8 @@ class OraclePool:
         elif sid:
             dsn = Oracle.makedsn(host, port, sid=sid)
 
-        return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=min_size, max=max_size, increment=1,
-                                  encoding='UTF-8', threaded=True)
+        return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=min_size, max=max_size,
+                                  increment=increment, encoding='UTF-8', threaded=True)
 
     @property
     @contextmanager
