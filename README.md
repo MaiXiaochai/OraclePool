@@ -16,6 +16,11 @@
 + 参考[example.py](https://github.com/MaiXiaochai/OraclePool/blob/master/example.py)
 
 ##### 更新历史：
+**[2023-03-17]**
++ pool_size默认值调整为10,并重命名为max_size;
++ 添加min_size参数，默认为1，方便单线程程序使用；
++ 添加threaded=True参数，其本身线程安全，不用额外加锁，大大提升效率;
++ increment默认为1，并且作为可选参数。
 
 **[2022-04-20]**
 
