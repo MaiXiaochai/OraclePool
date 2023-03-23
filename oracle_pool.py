@@ -42,6 +42,31 @@ class OraclePool:
         min_size            初始化时，连接池中至少创建的空闲连接。0表示不创建
         max_size            最大连接数
         increment           每次增加的连接数量
+
+        官方推荐的是使用固定大小的连接池，即min_size=max_size，increment=0，为了连接池的性能，避免连接波动。
+        以下是相关原文
+        https://cx-oracle.readthedocs.io/en/latest/user_guide/connection_handling.html#connpool
+        The Oracle Real-World Performance Group’s recommendation is to use fixed size connection pools.
+        The values of min and max should be the same (and the increment equal to zero).
+        This avoids connection storms which can decrease throughput.
+
+        https://docs.oracle.com/en/database/oracle/oracle-database/21/adfns/connection_strategies.html#GUID-7DFBA826-7CC0-4D16-B19C-31D168069B54
+        A prevalent myth is that a dynamic connection pool creates connections as required and reduces them when they are not needed.
+        In reality, when the connection pool is exhausted, application servers enable the size of the pool of database connections to increase rapidly.
+        The number of sessions increases with little load on the system, leading to a performance problem when all the sessions become active.
+
+        连接数推荐：
+        As a rule of thumb, the Oracle Real-World Performance group recommends a 90/10 ratio of %user to %system CPU utilization,
+        and an average of no more than 10 processes per CPU core on the database server.
+        The number of connections should be based on the number of CPU cores and not the number of CPU core threads.
+        For example, suppose a server has 2 CPUs and each CPU has 18 cores.Each CPU core has 2 threads.
+        Based on the Oracle Real-Wold Performance group guidelines,
+        the application can have between 36 and 360 connections to the database instance.
+
+        根据经验，Oracle Real-World Performance组建议用户和系统CPU利用率的比例为90:10，
+        并且在数据库服务器上，平均每个CPU内核不超过10个进程。连接数应该以CPU核数为基础，而不是CPU内核线程数。
+        例如，假设服务器有2个CPU，每个CPU有18个内核。每个CPU内核有2个线程。
+        根据Oracle Real-Wold Performance组指南，应用程序可以有36到360个连接到数据库实例。
         """
         dsn = None
         if service_name:
@@ -49,8 +74,10 @@ class OraclePool:
         elif sid:
             dsn = Oracle.makedsn(host, port, sid=sid)
 
+        # Oracle.SPOOL_ATTRVAL_WAIT: 从连接池中获取连接时，如果没有可用连接，进行等待，直到有可用连接
         return Oracle.SessionPool(user=username, password=password, dsn=dsn, min=min_size, max=max_size,
-                                  increment=increment, encoding='UTF-8', threaded=True)
+                                  increment=increment, getmode=Oracle.SPOOL_ATTRVAL_WAIT, encoding='UTF-8',
+                                  threaded=True)
 
     @property
     @contextmanager
@@ -63,6 +90,7 @@ class OraclePool:
             yield _cursor
         finally:
             _conn.commit()
+            # 释放连接
             self.__pool.release(_conn)
 
     def execute(self, sql: str, *args, **kwargs):
