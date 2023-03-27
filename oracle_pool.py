@@ -36,19 +36,25 @@ class OraclePool:
         self.__pool = self.__get_pool(username, password, host, port, sid=sid, service_name=service_name)
 
     @staticmethod
-    def __get_pool(username, password, host, port, sid=None, service_name=None, min_size=1, max_size=10, increment=1):
+    def __get_pool(username, password, host, port, sid=None, service_name=None, min_size=8, max_size=8, increment=0):
         """
         以下设置，根据需要进行配置
         min_size            初始化时，连接池中至少创建的空闲连接。0表示不创建
         max_size            最大连接数
         increment           每次增加的连接数量
 
-        官方推荐的是使用固定大小的连接池，即min_size=max_size，increment=0，为了连接池的性能，避免连接波动。
+        官方推荐的是使用固定大小的连接池，即min_size=max_size，increment=0，为了连接池的性能，避免连接波动， 也是为了避免连接风暴。
         以下是相关原文
         https://cx-oracle.readthedocs.io/en/latest/user_guide/connection_handling.html#connpool
         The Oracle Real-World Performance Group’s recommendation is to use fixed size connection pools.
         The values of min and max should be the same (and the increment equal to zero).
         This avoids connection storms which can decrease throughput.
+
+        连接风暴的产生过程：
+        https://docs.oracle.com/en/database/oracle/oracle-database/21/adfns/connection_strategies.html#GUID-1B9A21E9-B8E6-4F75-AC9D-1F5D13A1F6F9
+        A connection storm is a race condition in which application servers initiate an increasing number of connection requests,
+        but the database server CPU is unable to schedule them immediately, which causes the application servers to create more connections.
+
 
         https://docs.oracle.com/en/database/oracle/oracle-database/21/adfns/connection_strategies.html#GUID-7DFBA826-7CC0-4D16-B19C-31D168069B54
         A prevalent myth is that a dynamic connection pool creates connections as required and reduces them when they are not needed.
