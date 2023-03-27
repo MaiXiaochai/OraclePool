@@ -16,7 +16,15 @@
 + 参考[example.py](https://github.com/MaiXiaochai/OraclePool/blob/master/example.py)
 
 ##### 更新历史：
+
+**[2023-03-27]**
+
++ 调整默认参数，使得连接池默认为静态连接池。即，最大连接数和最小连接数一致，增长数为0
++ 设置了`getmode=Oracle.SPOOL_ATTRVAL_WAIT`，使得当连接池中没有可用连接时，会等待，而不是报错
++ 添加了大量来自官方文文档的注释，并翻译了其中部分关键内容，解释一些设置的来龙去脉
+
 **[2023-03-17]**
+
 + pool_size默认值调整为10,并重命名为max_size;
 + 添加min_size参数，默认为1，方便单线程程序使用；
 + 添加threaded=True参数，其本身线程安全，不用额外加锁，大大提升效率;
@@ -56,10 +64,10 @@
 
 **[2019-05-29]**
 
-  + ##### `oracle_conn_pool.py` 文件为主文件
++ ##### `oracle_conn_pool.py` 文件为主文件
 
-  + ##### `requirements.txt` 中为所需要的包，使用方法如下
++ ##### `requirements.txt` 中为所需要的包，使用方法如下
 
-    `pip install -r requirements.txt`
+  `pip install -r requirements.txt`
 
-  + ##### 内有测试函数，具体的额外的参数修改可以参考类内部的说明
++ ##### 内有测试函数，具体的额外的参数修改可以参考类内部的说明
